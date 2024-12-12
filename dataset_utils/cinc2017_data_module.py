@@ -185,7 +185,7 @@ class Cinc2017DataModuleFL(Cinc2017DataModule):
         partition = self.client_set_partitioner.load_partition(partition_id)
         partition_train_test = partition.train_test_split(
             test_size=0.1,
-            # stratify_by_column="label",
+            stratify_by_column="label",
             seed=self.random_seed,
         )
 

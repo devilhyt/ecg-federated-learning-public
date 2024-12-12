@@ -21,6 +21,7 @@ class DenseNet1dModule(L.LightningModule):
         memory_efficient: bool = True,
         lr: float = 1e-3,
         min_lr: float = 1e-5,
+        drop_rate: float = 0.2,
     ):
         super().__init__()
         self.num_classes = num_classes
@@ -31,7 +32,7 @@ class DenseNet1dModule(L.LightningModule):
 
         # model
         self.model = densenet_ecg_1d(
-            drop_rate=0.2,
+            drop_rate=drop_rate,
             num_classes=self.num_classes,
             memory_efficient=memory_efficient,
         )
