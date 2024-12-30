@@ -159,7 +159,6 @@ if uploaded_file is not None:
         )
     )
     fig.update_layout(
-        title="ECG Signal",
         xaxis_title="Time (s)",
         yaxis_title="Amplitude",
         template="plotly_dark" if theme_base == "dark" else "plotly_white",
@@ -175,7 +174,6 @@ if uploaded_file is not None:
 
     # display results
     st.header("Results")
-    st.write()
     col = st.columns(4)
     col[0].metric("Prediction", pred_class)
     col[1].metric(
@@ -185,18 +183,21 @@ if uploaded_file is not None:
     col[2].metric("HRV MeanNN", f'{intervalrelated["HRV_MeanNN"][0][0][0]:.2f} ms')
     col[3].metric("HRV SDNN", f'{intervalrelated["HRV_SDNN"][0][0][0]:.2f} ms')
 
+    st.subheader("ECG Signal")
     st.plotly_chart(fig)
 
     fig_col = st.columns(2)
     seg_ax = nk.ecg_segment(
         preprocessed_signal, rpeaks, sampling_rate=dst_freq, show="return"
     )
-    seg_fig = seg_ax.figure
     seg_ax.set_title("")
+    seg_fig = seg_ax.figure
     
     rri, rri_time, rri_missing = _hrv_format_input(rpeaks, sampling_rate=dst_freq)
     hrv_time_fig = _hrv_time_show(rri)
     hrv_time_fig.suptitle("")
+    hrv_time_axes = hrv_time_fig.get_axes()
+    hrv_time_axes[0].set_ylabel("Count")
     
     fig_col[0].subheader("Individual Heart Beats")
     fig_col[0].pyplot(seg_fig)
