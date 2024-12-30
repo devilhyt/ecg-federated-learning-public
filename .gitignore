@@ -1,6 +1,7 @@
 dataset/
 wandb_logs/wandb
 wandb/
+artifacts/
 
 *~
 
