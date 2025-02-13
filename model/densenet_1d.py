@@ -250,7 +250,8 @@ class DenseNet1d(nn.Module):
 
 def densenet_ecg_1d(**kwargs: Any) -> DenseNet1d:
     r"""Densenet-ECG-1D model"""
-    return DenseNet1d(16, (6, 6, 12, 12, 12, 12), 64, **kwargs)
+    
+    return DenseNet1d(32, (8, 8, 8, 8, 8, 8), 64, **kwargs)
 
 
 def densenet121_1d(**kwargs: Any) -> DenseNet1d:
