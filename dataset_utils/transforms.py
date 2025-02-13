@@ -24,16 +24,28 @@ class RandomTimeScale(nn.Module):
             )
             # resample the signal
             signal = nk.signal_resample(signal, desired_length)
-            # signal length standardization
-            if len(signal) > length:
-                # random crop
-                start = random.randint(0, len(signal) - length)
-                signal = signal[start : start + length]
-            else:
-                # do nothing or repeat the signal to match the original length
-                signal = np.resize(signal, length)
         return signal
 
+class RandomCrop(nn.Module):
+    def __init__(self, length) -> None:
+        super().__init__()
+        if not (isinstance(length, int) and length > 0):
+            raise ValueError("length must be a positive integer")
+        self.length = length
+    def forward(self, signal):
+        length = len(signal)
+        
+        if length == self.length:
+            return signal
+        
+        if length > self.length:
+            # random crop
+            start = random.randint(0, length - self.length)
+            return signal[start : start + self.length]
+        
+        if length < self.length:
+            # padding with zeros
+            return np.pad(signal, (0, self.length - length), 'constant')
 
 class RandomNoise(nn.Module):
     def __init__(self, signal_freq, noise_amplitude, noise_freq, p=0.5) -> None:

@@ -39,12 +39,11 @@ class Cinc2017Dataset(Dataset):
         for record_name in self.dataset_df["record_name"]:
             signal = np.loadtxt(self.preprocessed_dir / f"{record_name}.csv")
             self.signals.append(signal)
-        self.signals = np.array(self.signals)
 
         # keep only the classes of interest
         keep_ind = np.isin(self.labels, Cinc2017Dataset.classes)
         self.labels = self.labels[keep_ind]
-        self.signals = self.signals[keep_ind]
+        self.signals = [signal for i, signal in enumerate(self.signals) if keep_ind[i]]
 
         # encode labels
         self.encoded_labels = np.array(

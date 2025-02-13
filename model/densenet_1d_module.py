@@ -1,3 +1,4 @@
+import configparser
 import torch
 import torch.nn as nn
 import torch.optim.lr_scheduler as lr_scheduler
@@ -27,8 +28,13 @@ class DenseNet1dModule(L.LightningModule):
         self.num_classes = num_classes
 
         # settings
+        config = configparser.ConfigParser()
+        config.read("config.ini")
+        dst_freq = config.getint("data_preprocessing", "dst_freq")
+        dst_time = config.getint("data_preprocessing", "dst_time")
+        dst_length = dst_freq * dst_time
         self.save_hyperparameters()
-        self.example_input_array = torch.Tensor(1, 1, 3600)
+        self.example_input_array = torch.Tensor(1, 1, dst_length)
 
         # model
         self.model = densenet_ecg_1d(
