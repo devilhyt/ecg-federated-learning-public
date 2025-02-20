@@ -169,7 +169,6 @@ class DenseNet1d(nn.Module):
         drop_rate: float = 0,
         num_classes: int = 4,
         memory_efficient: bool = False,
-        classifier_drop_rate: float = 0,
     ) -> None:
 
         super().__init__()
