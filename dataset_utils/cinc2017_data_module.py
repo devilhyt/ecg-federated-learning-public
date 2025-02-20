@@ -13,6 +13,7 @@ from .transforms import (
     RandomNoise,
     RandomInvert,
     MinMaxNorm,
+    RandomCrop,
 )
 
 
@@ -28,7 +29,9 @@ class Cinc2017DataModule(L.LightningDataModule):
         config = configparser.ConfigParser()
         config.read("config.ini")
         self.random_seed = config.getint("data_preprocessing", "random_seed")
-        self.signal_freq = config.getint("data_preprocessing", "dst_freq")
+        dst_freq = config.getint("data_preprocessing", "dst_freq")
+        dst_time = config.getint("data_preprocessing", "dst_time")
+        dst_length = dst_freq * dst_time
 
         # dataloader parameters
         self.batch_size = batch_size
@@ -39,18 +42,19 @@ class Cinc2017DataModule(L.LightningDataModule):
             [
                 RandomTimeScale(factor=0.2, p=0.3),
                 RandomNoise(
-                    signal_freq=self.signal_freq,
+                    signal_freq=dst_freq,
                     noise_amplitude=0.2,
-                    noise_freq=self.signal_freq // 10,
+                    noise_freq=dst_freq // 10,
                     p=0.3,
                 ),
-                RandomInvert(signal_freq=self.signal_freq, p=0.3),
+                RandomCrop(length=dst_length),
                 MinMaxNorm(),
-                v2.Lambda(lambda x: torch.tensor(x, dtype=torch.float).unsqueeze(0)),
+                v2.Lambda(lambda x: torch.tensor(x, dtype=torch.float32).unsqueeze(0)),
             ]
         )
         self.transforms = v2.Compose(
             [
+                RandomCrop(length=dst_length),
                 MinMaxNorm(),
                 v2.Lambda(lambda x: torch.tensor(x, dtype=torch.float32).unsqueeze(0)),
             ]

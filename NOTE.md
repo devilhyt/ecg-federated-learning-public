@@ -7,16 +7,7 @@
 2. Inversion correction
     - If the signal is inverted, correct it.
 3. Downsampling
-    - From 300hz to 120hz.
-4. Data Length Standardization 
-    - Target time is 30sec
-    - Target length is 3600 (Target time * resampled frequency)
-    - If signal lenght > Target length
-        - Discard the redundant signal.
-    - If signal lenght < Target length 
-        - Duplicate the signal until it reaches the required length.
-    - If signal lenght = Target length
-        - Do nothing.
+    - From 300hz to 100hz.
 
 ## Spilt Dataset
 1. Split the dataset into `Train`, `Valid`, and `Test` sets.
@@ -37,13 +28,22 @@
     - ~~Random Mask~~
 2. ~~Outlier Handling~~
     - ~~Clip the signal to the range of ±3 standard deviations.~~
-3. Voltage Normalization
+3. Data Length Standardization 
+    - Target time is 60sec
+    - Target length is 6000 (Target time * resampled frequency)
+    - If signal length > Target length
+        - Discard the redundant signal.
+    - If signal length < Target length 
+        - Zero padding.
+    - If signal length = Target length
+        - Do nothing.
+4. Voltage Normalization
     - min-max normalization
     - ~~mean normalization~~
     - ~~z-score normalization~~
-4. Convert To Tensor
-5. Unsqueeze
-6. Imbalance Dataset Handling
+5. Convert To Tensor
+6. Unsqueeze
+7. Imbalance Dataset Handling
     - Using `WeightedRandomSampler`.
-7. Federated Dataset Partitioning
+8. Federated Dataset Partitioning
     - Using one of methods in `flwr_datasets.partitioner`.
