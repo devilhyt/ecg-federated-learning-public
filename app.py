@@ -8,7 +8,7 @@ from streamlit_theme import st_theme
 import pandas as pd
 import neurokit2 as nk
 import scipy.io as sio
-from model import DenseNet1dModule
+from model import DenseNetGruEcgModule
 from dataset_utils import Cinc2017DataModule
 from dataset_utils import Cinc2017Dataset
 import torch
@@ -71,7 +71,7 @@ def file_uploader_on_change():
 @st.cache_resource
 def load_model():
     artifact = api.artifact("devilhyt/ecg-federated/model-durm1360:v0")
-    model = DenseNet1dModule.load_from_checkpoint(
+    model = DenseNetGruEcgModule.load_from_checkpoint(
         checkpoint_path="artifacts/model-durm1360:v0/best.ckpt"
     )
     model.eval()

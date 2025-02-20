@@ -1,21 +1,15 @@
+import math
 from collections import OrderedDict
-from typing import Any, List, Tuple
+from typing import List, Tuple
 
 import torch
 import torch.nn as nn
 import torch.utils.checkpoint as cp
-import math
 from torch import Tensor
-
 from torchvision.utils import _log_api_usage_once
 
 __all__ = [
-    "DenseNet1d",
-    "densenet_ecg_1d",
-    "densenet121_1d",
-    "densenet169_1d",
-    "densenet201_1d",
-    "densenet264_1d",
+    "DenseNetGruEcg",
 ]
 
 
@@ -26,7 +20,7 @@ class _DenseLayer(nn.Module):
         growth_rate: int,
         bn_size: int,
         drop_rate: float,
-        memory_efficient: bool = False,
+        memory_efficient: bool,
     ) -> None:
         super().__init__()
 
@@ -120,7 +114,7 @@ class _DenseBlock(nn.ModuleDict):
         bn_size: int,
         growth_rate: int,
         drop_rate: float,
-        memory_efficient: bool = False,
+        memory_efficient: bool,
     ) -> None:
         super().__init__()
         for i in range(num_layers):
@@ -152,12 +146,12 @@ class _Transition(nn.Sequential):
         self.pool = nn.AvgPool1d(kernel_size=2, stride=2)
 
 
-class DenseNet1d(nn.Module):
-    r"""Densenet 1D model class.
+class DenseNetGruEcg(nn.Module):
+    r"""DenseNet GRU ECG model class.
 
     Args:
         growth_rate (int) - how many filters to add each layer (`k` in paper)
-        block_config (list of 4 ints) - how many layers in each pooling block
+        block_config (list of ints) - how many layers in each pooling block
         num_init_features (int) - the number of filters to learn in the first convolution layer
         bn_size (int) - multiplicative factor for number of bottle neck layers
           (i.e. bn_size * k features in the bottleneck layer)
@@ -166,13 +160,12 @@ class DenseNet1d(nn.Module):
         memory_efficient (bool) - If True, uses checkpointing. Much more memory efficient,
           but slower. Default: *False*. See `"paper" <https://arxiv.org/pdf/1707.06990.pdf>`_.
         compression_factor (float) - factor to reduce the number of features in each transition block. (`θ` in paper)
-        init_layer (nn.Sequential) - custom initial layer
     """
 
     def __init__(
         self,
-        growth_rate: int = 32,
-        block_config: Tuple[int, ...] = (6, 12, 24, 16),
+        growth_rate: int = 16,
+        block_config: Tuple[int, ...] = (4, 4, 4, 4, 12, 8, 8, 8, 8),
         num_init_features: int = 64,
         bn_size: int = 4,
         drop_rate: float = 0,
@@ -181,26 +174,19 @@ class DenseNet1d(nn.Module):
         num_classes: int = 4,
         memory_efficient: bool = False,
         compression_factor: float = 0.5,
-        init_layer: nn.Sequential = None,
     ) -> None:
 
         super().__init__()
         _log_api_usage_once(self)
 
         # First convolution
-        if init_layer is None:
-            self.features = nn.Sequential(
-                OrderedDict(
-                    [
-                        ("conv0", nn.Conv1d(1, num_init_features, kernel_size=7, stride=2, padding=3, bias=False)),
-                        ("norm0", nn.BatchNorm1d(num_init_features)),
-                        ("lrelu0", nn.LeakyReLU(inplace=True)),
-                        ("pool0", nn.MaxPool1d(kernel_size=3, stride=2, padding=1)),
-                    ]
-                ) 
-            )  # fmt: skip
-        else:
-            self.features = init_layer
+        self.features = nn.Sequential(
+            OrderedDict(
+                [
+                    ("conv0", nn.Conv1d(1, num_init_features, kernel_size=3, stride=1, padding=1, bias=False)),
+                ]
+            ) 
+        )  # fmt: skip
 
         # Each denseblock
         num_features = num_init_features
@@ -242,8 +228,6 @@ class DenseNet1d(nn.Module):
         self.fc_layer = nn.Sequential(
             OrderedDict(
                 [
-                    # ("pool", nn.AdaptiveAvgPool1d(1)),
-                    # ("flatten", nn.Flatten()),
                     ("fc1", nn.Linear(num_features, num_features)),
                     ("lrelu1", nn.LeakyReLU(inplace=True)),
                     ("dropout1", nn.Dropout(p=fc_drop_rate)),
@@ -272,43 +256,3 @@ class DenseNet1d(nn.Module):
         out = torch.mean(out, dim=1)
         out = self.fc_layer(out)
         return out
-
-
-def densenet_ecg_1d(**kwargs: Any) -> DenseNet1d:
-    r"""Densenet-ECG-1D model"""
-
-    num_init_features = 64
-    init_layer  = nn.Sequential(
-        OrderedDict(
-            [
-                ("conv0", nn.Conv1d(1, num_init_features, kernel_size=3, stride=1, padding=1, bias=False)),
-            ]
-        ) 
-    )  # fmt: skip
-    return DenseNet1d(
-        16,
-        (4, 4, 4, 4, 4, 12, 8, 8, 8, 8),
-        num_init_features,
-        init_layer=init_layer,
-        **kwargs
-    )
-
-
-def densenet121_1d(**kwargs: Any) -> DenseNet1d:
-    r"""Densenet-121-1D model"""
-    return DenseNet1d(32, (6, 12, 24, 16), 64, **kwargs)
-
-
-def densenet169_1d(**kwargs: Any) -> DenseNet1d:
-    r"""Densenet-169-1D model"""
-    return DenseNet1d(32, (6, 12, 32, 32), 64, **kwargs)
-
-
-def densenet201_1d(**kwargs: Any) -> DenseNet1d:
-    r"""Densenet-201-1D model"""
-    return DenseNet1d(32, (6, 12, 48, 32), 64, **kwargs)
-
-
-def densenet264_1d(**kwargs: Any) -> DenseNet1d:
-    r"""Densenet-264-1D model"""
-    return DenseNet1d(32, (6, 12, 64, 48), 64, **kwargs)

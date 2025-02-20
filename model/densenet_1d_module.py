@@ -1,30 +1,33 @@
 import configparser
+import inspect
+
+import lightning as L
 import torch
 import torch.nn as nn
 import torch.optim.lr_scheduler as lr_scheduler
-import lightning as L
 import torchmetrics
 from torchmetrics.classification import (
     MulticlassAccuracy,
-    MulticlassF1Score,
     MulticlassConfusionMatrix,
+    MulticlassF1Score,
 )
 
-from .densenet_1d import densenet_ecg_1d
+from .densenet_gru_ecg import DenseNetGruEcg
 
 
-class DenseNet1dModule(L.LightningModule):
+class DenseNetGruEcgModule(L.LightningModule):
     def __init__(
         self,
         num_classes: int,
-        show_valid_cm: bool = True,
-        memory_efficient: bool = True,
+        max_epochs: int,
         lr: float = 1e-3,
         min_lr: float = 1e-5,
-        drop_rate: float = 0.2,
+        show_valid_cm: bool = True,
+        **kwargs,
     ):
         super().__init__()
         self.num_classes = num_classes
+        self.max_epochs = max_epochs
 
         # settings
         config = configparser.ConfigParser()
@@ -36,10 +39,11 @@ class DenseNet1dModule(L.LightningModule):
         self.example_input_array = torch.Tensor(1, 1, dst_length)
 
         # model
-        self.model = densenet_ecg_1d(
-            drop_rate=drop_rate,
-            num_classes=self.num_classes,
-            memory_efficient=memory_efficient,
+        model_kwargs = inspect.signature(DenseNetGruEcg).parameters.keys()
+        model_kwargs = {k: v for k, v in kwargs.items() if k in model_kwargs}
+        self.model = DenseNetGruEcg(
+            num_classes=num_classes,
+            **model_kwargs,
         )
 
         self.loss_fn = nn.CrossEntropyLoss()
@@ -49,7 +53,9 @@ class DenseNet1dModule(L.LightningModule):
         # metrics
         metrics = torchmetrics.MetricCollection(
             {
-                "acc": MulticlassAccuracy(num_classes=self.num_classes, average="micro"),
+                "acc": MulticlassAccuracy(
+                    num_classes=self.num_classes, average="micro"
+                ),
                 "f1": MulticlassF1Score(num_classes=self.num_classes),
             }
         )
@@ -99,7 +105,7 @@ class DenseNet1dModule(L.LightningModule):
         self.test_cm.update(y_pred, y)
         self.log("test_loss", loss, prog_bar=True, on_step=False, on_epoch=True)
         self.log_dict(self.test_metrics, prog_bar=True, on_step=False, on_epoch=True)
-        
+
         y_hat = torch.argmax(y_pred, dim=1).tolist()
         self.test_y_hat_log.extend(y_hat)
         self.test_y_true_log.extend(y.tolist())
@@ -134,7 +140,7 @@ class DenseNet1dModule(L.LightningModule):
     def on_test_epoch_start(self):
         self.test_y_true_log.clear()
         self.test_y_hat_log.clear()
-    
+
     def on_test_epoch_end(self):
         self.test_cm_log = self.test_cm.compute()
         self.test_cm.reset()
@@ -142,8 +148,12 @@ class DenseNet1dModule(L.LightningModule):
     # configurations
     def configure_optimizers(self):
         optimizer = torch.optim.AdamW(self.parameters(), lr=self.lr, weight_decay=1e-4)
-        scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.5, patience=3, min_lr=self.min_lr)  # fmt: skip
-        # scheduler = lr_scheduler.StepLR(optimizer, step_size=40, gamma=0.1)
+        # scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.5, patience=3, min_lr=self.min_lr)
+        scheduler = lr_scheduler.MultiStepLR(
+            optimizer,
+            milestones=[int(self.max_epochs * 0.5), int(self.max_epochs * 0.75)],
+            gamma=0.5,
+        )
         return {
             "optimizer": optimizer,
             "lr_scheduler": {
@@ -151,36 +161,3 @@ class DenseNet1dModule(L.LightningModule):
                 "monitor": "valid_loss",
             },
         }
-
-
-class DenseNet1dModuleFL(DenseNet1dModule):
-    """FedProx loss version of DenseNet1dModule"""
-
-    def __init__(
-        self,
-        proximal_mu: float = 0.5,
-        **kwargs,
-    ):
-        super().__init__(**kwargs)
-        self.proximal_mu = proximal_mu
-        self.global_params = None
-
-    def init_global_params(self):
-        self.global_params = [p.detach().clone() for p in self.model.parameters()]
-
-    # steps
-    def _common_step(self, batch):
-        x, y = batch["signal"], batch["label"]
-        y_pred = self(x)
-
-        if self.global_params is None:
-            self.init_global_params()
-
-        proximal_term = 0.0
-        for local_weights, global_weights in zip(
-            self.model.parameters(), self.global_params
-        ):
-            proximal_term += torch.square((local_weights - global_weights).norm(2))
-
-        loss = self.loss_fn(y_pred, y) + (self.proximal_mu / 2) * proximal_term
-        return loss, y_pred, y
