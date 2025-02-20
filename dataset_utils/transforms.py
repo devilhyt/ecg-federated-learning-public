@@ -122,7 +122,7 @@ class RandomMask(nn.Module):
         return signal
 
 
-class Clip(nn.Module):
+class StaticZScoreClip(nn.Module):
     def __init__(self, mean, std, factor=3) -> None:
         super().__init__()
         if not (isinstance(mean, (int, float))):
@@ -143,7 +143,7 @@ class Clip(nn.Module):
         )
         return signal
     
-class ClipV2(nn.Module):
+class ZScoreClip(nn.Module):
     def __init__(self, factor=3) -> None:
         super().__init__()
         if not (isinstance(factor, (int, float)) and factor > 0):
