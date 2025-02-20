@@ -11,7 +11,6 @@ from .cinc2017_dataset import Cinc2017Dataset
 from .transforms import (
     RandomTimeScale,
     RandomNoise,
-    RandomInvert,
     MinMaxNorm,
     RandomCrop,
 )
@@ -165,7 +164,7 @@ class Cinc2017DataModuleFL(Cinc2017DataModule):
 
             self.client_set_partitioner.dataset = dataset
         elif stage == "train_eval":
-            # Provide the training set for server-side evaluation 
+            # Provide the training set for server-side evaluation
             # without applying any data augmentation.
             self.train_eval_set = Cinc2017Dataset(
                 dataset="train",
@@ -174,7 +173,7 @@ class Cinc2017DataModuleFL(Cinc2017DataModule):
             )
         else:
             super().setup(stage)
-    
+
     def train_eval_dataloader(self):
         """Provide the training set dataloader for server side evaluation."""
         return DataLoader(
