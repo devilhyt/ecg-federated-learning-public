@@ -1,3 +1,4 @@
+import configparser
 import torch
 import torch.nn as nn
 import torch.optim.lr_scheduler as lr_scheduler
@@ -10,7 +11,6 @@ from torchmetrics.classification import (
 )
 
 from .densenet_1d import densenet_ecg_1d
-import copy
 
 
 class DenseNet1dModule(L.LightningModule):
@@ -27,8 +27,13 @@ class DenseNet1dModule(L.LightningModule):
         self.num_classes = num_classes
 
         # settings
+        config = configparser.ConfigParser()
+        config.read("config.ini")
+        dst_freq = config.getint("data_preprocessing", "dst_freq")
+        dst_time = config.getint("data_preprocessing", "dst_time")
+        dst_length = dst_freq * dst_time
         self.save_hyperparameters()
-        self.example_input_array = torch.Tensor(1, 1, 3600)
+        self.example_input_array = torch.Tensor(1, 1, dst_length)
 
         # model
         self.model = densenet_ecg_1d(
@@ -44,7 +49,7 @@ class DenseNet1dModule(L.LightningModule):
         # metrics
         metrics = torchmetrics.MetricCollection(
             {
-                "acc": MulticlassAccuracy(num_classes=self.num_classes),
+                "acc": MulticlassAccuracy(num_classes=self.num_classes, average="micro"),
                 "f1": MulticlassF1Score(num_classes=self.num_classes),
             }
         )
@@ -59,6 +64,8 @@ class DenseNet1dModule(L.LightningModule):
         self.lr_log = float("inf")
         self.valid_cm_log = None
         self.test_cm_log = None
+        self.test_y_true_log = []
+        self.test_y_hat_log = []
 
     def forward(self, x):
         return self.model(x)
@@ -92,6 +99,10 @@ class DenseNet1dModule(L.LightningModule):
         self.test_cm.update(y_pred, y)
         self.log("test_loss", loss, prog_bar=True, on_step=False, on_epoch=True)
         self.log_dict(self.test_metrics, prog_bar=True, on_step=False, on_epoch=True)
+        
+        y_hat = torch.argmax(y_pred, dim=1).tolist()
+        self.test_y_hat_log.extend(y_hat)
+        self.test_y_true_log.extend(y.tolist())
         return loss
 
     def predict_step(self, batch, batch_idx, dataloader_idx=0):
@@ -120,6 +131,10 @@ class DenseNet1dModule(L.LightningModule):
         self.valid_cm_log = self.valid_cm.compute()
         self.valid_cm.reset()
 
+    def on_test_epoch_start(self):
+        self.test_y_true_log.clear()
+        self.test_y_hat_log.clear()
+    
     def on_test_epoch_end(self):
         self.test_cm_log = self.test_cm.compute()
         self.test_cm.reset()
@@ -128,6 +143,7 @@ class DenseNet1dModule(L.LightningModule):
     def configure_optimizers(self):
         optimizer = torch.optim.AdamW(self.parameters(), lr=self.lr, weight_decay=1e-4)
         scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.5, patience=3, min_lr=self.min_lr)  # fmt: skip
+        # scheduler = lr_scheduler.StepLR(optimizer, step_size=40, gamma=0.1)
         return {
             "optimizer": optimizer,
             "lr_scheduler": {

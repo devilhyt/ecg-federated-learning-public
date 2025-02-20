@@ -29,6 +29,8 @@ class _DenseLayer(nn.Module):
         memory_efficient: bool = False,
     ) -> None:
         super().__init__()
+
+        # settings
         self.memory_efficient = memory_efficient
 
         # bottleneck layer
@@ -42,7 +44,7 @@ class _DenseLayer(nn.Module):
             bias=False,
         )
 
-        # composite function
+        # composite layer
         self.norm2 = nn.BatchNorm1d(bn_size * growth_rate)
         self.lrelu2 = nn.LeakyReLU(inplace=True)
         self.conv2 = nn.Conv1d(
@@ -54,6 +56,7 @@ class _DenseLayer(nn.Module):
             bias=False,
         )
 
+        # dropout layer
         self.drop = nn.Dropout(p=drop_rate)
 
     def bn_function(self, inputs: List[Tensor]) -> Tensor:
@@ -163,26 +166,29 @@ class DenseNet1d(nn.Module):
         memory_efficient (bool) - If True, uses checkpointing. Much more memory efficient,
           but slower. Default: *False*. See `"paper" <https://arxiv.org/pdf/1707.06990.pdf>`_.
         compression_factor (float) - factor to reduce the number of features in each transition block. (`θ` in paper)
+        init_layer (nn.Sequential) - custom initial layer
     """
 
     def __init__(
         self,
         growth_rate: int = 32,
-        block_config: Tuple[int, int, int, int] = (6, 12, 24, 16),
+        block_config: Tuple[int, ...] = (6, 12, 24, 16),
         num_init_features: int = 64,
         bn_size: int = 4,
         drop_rate: float = 0,
+        gru_drop_rate: float = 0.2,
+        fc_drop_rate: float = 0.5,
         num_classes: int = 4,
         memory_efficient: bool = False,
         compression_factor: float = 0.5,
-        init_conv_layer: nn.Sequential = None,
+        init_layer: nn.Sequential = None,
     ) -> None:
 
         super().__init__()
         _log_api_usage_once(self)
 
         # First convolution
-        if init_conv_layer is None:
+        if init_layer is None:
             self.features = nn.Sequential(
                 OrderedDict(
                     [
@@ -194,7 +200,7 @@ class DenseNet1d(nn.Module):
                 ) 
             )  # fmt: skip
         else:
-            self.features = init_conv_layer
+            self.features = init_layer
 
         # Each denseblock
         num_features = num_init_features
@@ -217,18 +223,37 @@ class DenseNet1d(nn.Module):
                 self.features.add_module("transition%d" % (i + 1), trans)
                 num_features = math.floor(num_features * compression_factor)
 
-        # Classification layer
-        self.pool = nn.Sequential(
+        # Final layers
+        self.features.add_module("norm_final", nn.BatchNorm1d(num_features))
+        self.features.add_module("lrelu_final", nn.LeakyReLU(inplace=True))
+
+        # GRU layer
+        self.gru = nn.GRU(
+            input_size=num_features,
+            hidden_size=num_features,
+            num_layers=2,
+            batch_first=True,
+            bidirectional=True,
+            dropout=gru_drop_rate,
+        )
+        num_features = num_features * 2
+
+        # fc layer
+        self.fc_layer = nn.Sequential(
             OrderedDict(
                 [
-                    ("norm", nn.BatchNorm1d(num_features)),
-                    ("lrelu", nn.LeakyReLU(inplace=True)),
-                    ("pool", nn.AdaptiveAvgPool1d(1)),
+                    # ("pool", nn.AdaptiveAvgPool1d(1)),
+                    # ("flatten", nn.Flatten()),
+                    ("fc1", nn.Linear(num_features, num_features)),
+                    ("lrelu1", nn.LeakyReLU(inplace=True)),
+                    ("dropout1", nn.Dropout(p=fc_drop_rate)),
+                    ("fc2", nn.Linear(num_features, num_features)),
+                    ("lrelu2", nn.LeakyReLU(inplace=True)),
+                    ("dropout2", nn.Dropout(p=fc_drop_rate)),
+                    ("out", nn.Linear(num_features, num_classes)),
                 ]
             )
         )
-        self.flatten = nn.Flatten()
-        self.classifier = nn.Linear(num_features, num_classes)
 
         # Official init from torch repo.
         for m in self.modules():
@@ -241,16 +266,32 @@ class DenseNet1d(nn.Module):
                 nn.init.constant_(m.bias, 0)
 
     def forward(self, x: Tensor) -> Tensor:
-        features = self.features(x)
-        out = self.pool(features)
-        out = self.flatten(out)
-        out = self.classifier(out)
+        out = self.features(x)
+        out = out.permute(0, 2, 1)
+        out, _ = self.gru(out)
+        out = torch.mean(out, dim=1)
+        out = self.fc_layer(out)
         return out
 
 
 def densenet_ecg_1d(**kwargs: Any) -> DenseNet1d:
     r"""Densenet-ECG-1D model"""
-    return DenseNet1d(16, (6, 6, 12, 12, 12, 12), 64, **kwargs)
+
+    num_init_features = 64
+    init_layer  = nn.Sequential(
+        OrderedDict(
+            [
+                ("conv0", nn.Conv1d(1, num_init_features, kernel_size=3, stride=1, padding=1, bias=False)),
+            ]
+        ) 
+    )  # fmt: skip
+    return DenseNet1d(
+        16,
+        (4, 4, 4, 4, 4, 12, 8, 8, 8, 8),
+        num_init_features,
+        init_layer=init_layer,
+        **kwargs
+    )
 
 
 def densenet121_1d(**kwargs: Any) -> DenseNet1d:
