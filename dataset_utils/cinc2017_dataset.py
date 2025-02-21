@@ -1,9 +1,10 @@
-from typing import Callable, Optional
-from torch.utils.data import Dataset
-from pathlib import Path
-import pandas as pd
-import numpy as np
 import configparser
+from pathlib import Path
+from typing import Callable, Optional
+
+import numpy as np
+import pandas as pd
+from torch.utils.data import Dataset
 
 
 class Cinc2017Dataset(Dataset):
@@ -11,7 +12,7 @@ class Cinc2017Dataset(Dataset):
     classes = ["N", "A", "O"]  # "~" removed
     label_encoder = {label: i for i, label in enumerate(classes)}
     label_decoder = {i: label for label, i in label_encoder.items()}
-    num_classes = len(label_encoder)
+    num_classes = len(classes)
 
     def __init__(
         self,
