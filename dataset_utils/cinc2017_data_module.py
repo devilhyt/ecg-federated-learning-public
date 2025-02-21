@@ -87,10 +87,7 @@ class Cinc2017DataModule(L.LightningDataModule):
 
     def train_dataloader(self):
         # calculate class weights for weighted random sampler
-        encoded_labels = self.train_set.encoded_labels
-        class_unique, class_unique_count = np.unique(encoded_labels, return_counts=True)
-        weight_dict = dict(zip(class_unique, 1.0 / class_unique_count))
-        samples_weight = np.array([weight_dict[label] for label in encoded_labels])
+        samples_weight = self._get_samples_weight(self.train_set.encoded_labels)
 
         return DataLoader(
             self.train_set,
@@ -118,6 +115,12 @@ class Cinc2017DataModule(L.LightningDataModule):
 
     def predict_dataloader(self):
         return self.test_dataloader()
+    
+    def _get_samples_weight(self, encoded_labels):
+        label_count = np.bincount(encoded_labels, minlength=self.num_classes)
+        class_weight = 1.0 / label_count
+        samples_weight = class_weight[encoded_labels]
+        return samples_weight
 
 
 class Cinc2017DataModuleFL(Cinc2017DataModule):
@@ -193,10 +196,9 @@ class Cinc2017DataModuleFL(Cinc2017DataModule):
         )
 
         # calculate class weights for weighted random sampler
-        encoded_labels = partition_train_test["train"]["label"]
-        class_unique, class_unique_count = np.unique(encoded_labels, return_counts=True)
-        weight_dict = dict(zip(class_unique, 1.0 / class_unique_count))
-        samples_weight = np.array([weight_dict[label] for label in encoded_labels])
+        samples_weight = self._get_samples_weight(
+            partition_train_test["train"]["label"]
+        )
 
         # apply transforms
         partition_train_test = partition_train_test.with_transform(
