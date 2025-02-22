@@ -1,2 +1,2 @@
 from .densenet_gru_ecg import *
-from .densenet_1d_module import *
+from .densenet_gru_ecg_module import *

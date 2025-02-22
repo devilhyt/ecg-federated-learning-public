@@ -1,19 +1,15 @@
-from torch.utils.data import DataLoader, WeightedRandomSampler
-import lightning as L
-from torchvision.transforms import v2
-import torch
 import configparser
+
+import lightning as L
 import numpy as np
-from datasets import Dataset, ClassLabel
-from flwr_datasets.partitioner import IidPartitioner, DirichletPartitioner
+import torch
+from datasets import ClassLabel, Dataset
+from flwr_datasets.partitioner import DirichletPartitioner, IidPartitioner
+from torch.utils.data import DataLoader, WeightedRandomSampler
+from torchvision.transforms.v2 import Lambda
 
 from .cinc2017_dataset import Cinc2017Dataset
-from .transforms import (
-    RandomTimeScale,
-    RandomNoise,
-    MinMaxNorm,
-    RandomCrop,
-)
+from .transforms import Crop, MinMaxNorm, RandomNoise, RandomTimeScale
 
 
 class Cinc2017DataModule(L.LightningDataModule):
@@ -37,31 +33,31 @@ class Cinc2017DataModule(L.LightningDataModule):
         self.num_workers = num_workers
 
         # transforms
-        self.train_transforms = v2.Compose(
-            [
-                RandomTimeScale(factor=0.2, p=0.3),
-                RandomNoise(
-                    signal_freq=dst_freq,
-                    noise_amplitude=0.2,
-                    noise_freq=dst_freq // 10,
-                    p=0.3,
-                ),
-                RandomCrop(length=dst_length),
-                MinMaxNorm(),
-                v2.Lambda(lambda x: torch.tensor(x, dtype=torch.float32).unsqueeze(0)),
-            ]
+        self.train_transforms = torch.nn.Sequential(
+            RandomTimeScale(factor=0.2, p=0.3),
+            RandomNoise(
+                signal_freq=dst_freq,
+                noise_amplitude=0.2,
+                noise_freq=dst_freq // 10,
+                p=0.3,
+            ),
+            Lambda(lambda x: torch.tensor(x, dtype=torch.float32)),
+            Crop(length=dst_length, mode="random"),
+            MinMaxNorm(),
+            Lambda(lambda x: x.unsqueeze(0)),
         )
-        self.transforms = v2.Compose(
-            [
-                RandomCrop(length=dst_length),
-                MinMaxNorm(),
-                v2.Lambda(lambda x: torch.tensor(x, dtype=torch.float32).unsqueeze(0)),
-            ]
+        self.transforms = torch.nn.Sequential(
+            Lambda(lambda x: torch.tensor(x, dtype=torch.float32)),
+            Crop(length=dst_length, mode="start"),
+            MinMaxNorm(),
+            Lambda(lambda x: x.unsqueeze(0)),
         )
-        self.target_transform = v2.Lambda(lambda x: torch.tensor(x, dtype=torch.long))
+        self.target_transform = Lambda(lambda x: torch.tensor(x, dtype=torch.long))
 
     def setup(self, stage: str) -> None:
-        if stage == "fit":
+        if stage == "fit" and (
+            not hasattr(self, "train_set") or not hasattr(self, "valid_set")
+        ):
             self.train_set = Cinc2017Dataset(
                 dataset="train",
                 transform=self.train_transforms,
@@ -72,13 +68,13 @@ class Cinc2017DataModule(L.LightningDataModule):
                 transform=self.transforms,
                 target_transform=self.target_transform,
             )
-        elif stage == "validate":
+        elif stage == "validate" and not hasattr(self, "valid_set"):
             self.valid_set = Cinc2017Dataset(
                 dataset="valid",
                 transform=self.transforms,
                 target_transform=self.target_transform,
             )
-        elif stage in ["test", "predict"]:
+        elif stage in ["test", "predict"] and not hasattr(self, "test_set"):
             self.test_set = Cinc2017Dataset(
                 dataset="test",
                 transform=self.transforms,
@@ -115,7 +111,7 @@ class Cinc2017DataModule(L.LightningDataModule):
 
     def predict_dataloader(self):
         return self.test_dataloader()
-    
+
     def _get_samples_weight(self, encoded_labels):
         label_count = np.bincount(encoded_labels, minlength=self.num_classes)
         class_weight = 1.0 / label_count

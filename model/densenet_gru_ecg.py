@@ -38,7 +38,7 @@ class _DenseLayer(nn.Module):
             bias=False,
         )
 
-        # composite layer
+        # composite function
         self.norm2 = nn.BatchNorm1d(bn_size * growth_rate)
         self.lrelu2 = nn.LeakyReLU(inplace=True)
         self.conv2 = nn.Conv1d(
@@ -156,6 +156,8 @@ class DenseNetGruEcg(nn.Module):
         bn_size (int) - multiplicative factor for number of bottle neck layers
           (i.e. bn_size * k features in the bottleneck layer)
         drop_rate (float) - dropout rate after each dense layer
+        gru_drop_rate (float) - dropout rate after GRU layer
+        fc_drop_rate (float) - dropout rate after fully connected layer
         num_classes (int) - number of classification classes
         memory_efficient (bool) - If True, uses checkpointing. Much more memory efficient,
           but slower. Default: *False*. See `"paper" <https://arxiv.org/pdf/1707.06990.pdf>`_.
@@ -165,13 +167,13 @@ class DenseNetGruEcg(nn.Module):
     def __init__(
         self,
         growth_rate: int = 16,
-        block_config: Tuple[int, ...] = (4, 4, 4, 4, 12, 8, 8, 8, 8),
-        num_init_features: int = 64,
+        block_config: Tuple[int, ...] = (6, 4, 12, 8, 24, 16),
+        num_init_features: int = 32,
         bn_size: int = 4,
-        drop_rate: float = 0,
-        gru_drop_rate: float = 0.2,
+        db_drop_rate: float = 0,
+        gru_drop_rate: float = 0,
         fc_drop_rate: float = 0.5,
-        num_classes: int = 4,
+        num_classes: int = 3,
         memory_efficient: bool = False,
         compression_factor: float = 0.5,
     ) -> None:
@@ -196,18 +198,17 @@ class DenseNetGruEcg(nn.Module):
                 num_input_features=num_features,
                 bn_size=bn_size,
                 growth_rate=growth_rate,
-                drop_rate=drop_rate,
+                drop_rate=db_drop_rate,
                 memory_efficient=memory_efficient,
             )
             self.features.add_module("denseblock%d" % (i + 1), block)
             num_features = num_features + num_layers * growth_rate
-            if i != len(block_config) - 1:
-                trans = _Transition(
-                    num_input_features=num_features,
-                    num_output_features=math.floor(num_features * compression_factor),
-                )
-                self.features.add_module("transition%d" % (i + 1), trans)
-                num_features = math.floor(num_features * compression_factor)
+            trans = _Transition(
+                num_input_features=num_features,
+                num_output_features=math.floor(num_features * compression_factor),
+            )
+            self.features.add_module("transition%d" % (i + 1), trans)
+            num_features = math.floor(num_features * compression_factor)
 
         # Final layers
         self.features.add_module("norm_final", nn.BatchNorm1d(num_features))
@@ -228,12 +229,14 @@ class DenseNetGruEcg(nn.Module):
         self.fc_layer = nn.Sequential(
             OrderedDict(
                 [
+                    # ("avgpool", nn.AdaptiveAvgPool1d(1)),
+                    # ("flatten", nn.Flatten()), 
                     ("fc1", nn.Linear(num_features, num_features)),
                     ("lrelu1", nn.LeakyReLU(inplace=True)),
                     ("dropout1", nn.Dropout(p=fc_drop_rate)),
-                    ("fc2", nn.Linear(num_features, num_features)),
-                    ("lrelu2", nn.LeakyReLU(inplace=True)),
-                    ("dropout2", nn.Dropout(p=fc_drop_rate)),
+                    # ("fc2", nn.Linear(num_features, num_features)),
+                    # ("lrelu2", nn.LeakyReLU(inplace=True)),
+                    # ("dropout2", nn.Dropout(p=fc_drop_rate)),
                     ("out", nn.Linear(num_features, num_classes)),
                 ]
             )
@@ -250,7 +253,7 @@ class DenseNetGruEcg(nn.Module):
                 nn.init.constant_(m.bias, 0)
 
     def forward(self, x: Tensor) -> Tensor:
-        out = self.features(x)
+        out: Tensor = self.features(x)
         out = out.permute(0, 2, 1)
         out, _ = self.gru(out)
         out = torch.mean(out, dim=1)
