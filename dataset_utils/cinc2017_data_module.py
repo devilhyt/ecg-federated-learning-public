@@ -48,7 +48,7 @@ class Cinc2017DataModule(L.LightningDataModule):
         )
         self.transforms = torch.nn.Sequential(
             Lambda(lambda x: torch.tensor(x, dtype=torch.float32)),
-            Crop(length=dst_length, mode="start"),
+            Crop(length=dst_length, mode="head"),
             MinMaxNorm(),
             Lambda(lambda x: x.unsqueeze(0)),
         )

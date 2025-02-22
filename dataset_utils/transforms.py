@@ -69,14 +69,14 @@ class Crop(nn.Module):
     def __init__(
         self,
         length: int,
-        mode: Literal["start", "random"] = "start",
+        mode: Literal["head", "random"] = "head",
         padding_if_needed: bool = True,
     ) -> None:
         super().__init__()
         if not (isinstance(length, int) and length > 0):
             raise ValueError("length must be a positive integer")
-        if mode not in ["start", "random"]:
-            raise ValueError("mode must be either 'start' or 'random'")
+        if mode not in ["head", "random"]:
+            raise ValueError("mode must be either 'head' or 'random'")
         if not isinstance(padding_if_needed, bool):
             raise ValueError("padding_if_needed must be a boolean")
         self.length = length
@@ -94,7 +94,7 @@ class Crop(nn.Module):
 
         if signal_length > self.length:
             # crop
-            if self.mode == "start":
+            if self.mode == "head":
                 return signal[: self.length]
             else:
                 start = random.randint(0, signal_length - self.length)
