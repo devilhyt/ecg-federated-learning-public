@@ -110,7 +110,7 @@ class DenseNetGruEcgModule(L.LightningModule):
 
     # hooks
     def on_train_epoch_start(self):
-        self.trainer.progress_bar_metrics.clear()  # hack to clear progress bar
+        self.trainer.progress_bar_metrics.clear()  # avoid showing metrics from previous epoch
         self.lr_log = self.lr_schedulers().get_last_lr()[0]
 
     def on_train_epoch_end(self):
