@@ -11,6 +11,7 @@ from torchmetrics.classification import (
     MulticlassAUROC,
     MulticlassConfusionMatrix,
     MulticlassF1Score,
+    MulticlassAveragePrecision,
 )
 
 from .densenet_gru_ecg import DenseNetGruEcg
@@ -56,6 +57,7 @@ class DenseNetGruEcgModule(L.LightningModule):
                 ),
                 "f1": MulticlassF1Score(num_classes=self.num_classes),
                 "auroc": MulticlassAUROC(num_classes=self.num_classes),
+                "auprc": MulticlassAveragePrecision(num_classes=self.num_classes),
             }
         )
         self.train_metrics = metrics.clone(prefix="train_")
@@ -140,6 +142,6 @@ class DenseNetGruEcgModule(L.LightningModule):
             "optimizer": optimizer,
             "lr_scheduler": {
                 "scheduler": scheduler,
-                "monitor": "valid_loss",
+                # "monitor": "valid_loss",
             },
         }
