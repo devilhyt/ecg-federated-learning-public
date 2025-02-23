@@ -186,7 +186,7 @@ class Cinc2017DataModuleFL(Cinc2017DataModule):
         """Provide dataloaders for federated learning clients."""
         partition = self.client_set_partitioner.load_partition(partition_id)
         partition_train_test = partition.train_test_split(
-            test_size=0.1,
+            test_size=0.2,
             stratify_by_column="label",
             seed=self.random_seed,
         )
@@ -216,5 +216,5 @@ class Cinc2017DataModuleFL(Cinc2017DataModule):
         return train_dataloader, valid_dataloader
 
     def _apply_transforms(self, batch):
-        batch["signal"] = [self.train_transforms(signal) for signal in batch["signal"]]
+        batch["signal"] = [self.train_transforms(np.array(signal)) for signal in batch["signal"]]
         return batch
