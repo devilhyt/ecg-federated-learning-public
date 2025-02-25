@@ -1,4 +1,5 @@
 import inspect
+from typing import Literal
 
 import lightning as L
 import torch
@@ -20,9 +21,12 @@ from .densenet_gru_ecg import DenseNetGruEcg
 class DenseNetGruEcgModule(L.LightningModule):
     def __init__(
         self,
-        max_epochs: int,
         num_classes: int,
+        max_epochs: int | None = None,
         input_length: int | None = None,
+        lr_scheduler_mode: (
+            Literal["multi_step", "plateau", "cosine_annealing"] | None
+        ) = None,
         lr: float = 1e-3,
         min_lr: float = 1e-5,
         show_valid_cm: bool = True,
@@ -46,6 +50,7 @@ class DenseNetGruEcgModule(L.LightningModule):
         )
 
         self.loss_fn = nn.CrossEntropyLoss()
+        self.lr_scheduler_mode = lr_scheduler_mode
         self.lr = lr
         self.min_lr = min_lr
 
@@ -113,7 +118,7 @@ class DenseNetGruEcgModule(L.LightningModule):
     # hooks
     def on_train_epoch_start(self):
         self.trainer.progress_bar_metrics.clear()  # avoid showing metrics from previous epoch
-        self.lr_log = self.lr_schedulers().get_last_lr()[0]
+        self.lr_log = [group["lr"] for group in self.optimizers().param_groups][0]
 
     def on_train_epoch_end(self):
         # place show_valid_cm here to avoid repeated printing of the progress bar
@@ -130,18 +135,47 @@ class DenseNetGruEcgModule(L.LightningModule):
 
     # configurations
     def configure_optimizers(self):
-        optimizer = torch.optim.AdamW(self.parameters(), lr=self.lr, weight_decay=1e-4)
-        # scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.5, patience=3, min_lr=self.min_lr)
-        scheduler = lr_scheduler.MultiStepLR(
-            optimizer,
-            milestones=[int(self.max_epochs * 0.5), int(self.max_epochs * 0.75)],
-            gamma=0.5,
-        )
+        optimizer = torch.optim.AdamW(self.parameters(), lr=self.lr, weight_decay=1e-3)
 
-        return {
-            "optimizer": optimizer,
-            "lr_scheduler": {
-                "scheduler": scheduler,
-                # "monitor": "valid_loss",
-            },
-        }
+        if self.lr_scheduler_mode == "plateau":
+            config = {
+                "optimizer": optimizer,
+                "lr_scheduler": {
+                    "scheduler": lr_scheduler.ReduceLROnPlateau(
+                        optimizer, factor=0.5, patience=3, min_lr=self.min_lr
+                    ),
+                    "monitor": "valid_loss",
+                },
+            }
+        elif self.lr_scheduler_mode == "multi_step" and self.max_epochs is not None:
+            config = {
+                "optimizer": optimizer,
+                "lr_scheduler": {
+                    "scheduler": lr_scheduler.MultiStepLR(
+                        optimizer,
+                        milestones=[
+                            int(self.max_epochs * 0.5),
+                            int(self.max_epochs * 0.75),
+                        ],
+                        gamma=0.5,
+                    ),
+                },
+            }
+        elif (
+            self.lr_scheduler_mode == "cosine_annealing" and self.max_epochs is not None
+        ):
+            config = {
+                "optimizer": optimizer,
+                "lr_scheduler": {
+                    "scheduler": lr_scheduler.CosineAnnealingWarmRestarts(
+                        optimizer,
+                        T_0=int(self.max_epochs * 0.2),
+                        T_mult=1,
+                        eta_min=self.min_lr,
+                    ),
+                },
+            }
+        else:
+            config = {"optimizer": optimizer}
+
+        return config
