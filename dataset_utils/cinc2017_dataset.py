@@ -20,36 +20,34 @@ class Cinc2017Dataset(Dataset):
         transform: Optional[Callable] = None,
         target_transform: Optional[Callable] = None,
     ) -> None:
-        # select dataset
+        # select the dataset partition
         if dataset not in self.datasets:
             raise ValueError(f"dataset must be one of {Cinc2017Dataset.datasets}")
         self.dataset = dataset
 
-        # select dataset directory
+        # load dataset directories from config file
         config = configparser.ConfigParser()
         config.read("config.ini")
         self.dataset_dir = Path(config["data_preprocessing"]["dataset_dir"])
         self.preprocessed_dir = Path(config["data_preprocessing"]["dst_dir"])
-
-        # load labels
+        
+        # load the annotation file
         self.dataset_df = pd.read_csv(self.dataset_dir / f"{self.dataset}.csv")
-        self.labels = self.dataset_df["label"].to_numpy()
+        
+        # keep only the classes of interest
+        self.dataset_df = self.dataset_df[self.dataset_df["label"].isin(self.classes)]
 
+        # extract and encode labels
+        self.labels = self.dataset_df["label"].to_numpy()
+        self.encoded_labels = np.array(
+            [Cinc2017Dataset.label_encoder[label] for label in self.labels]
+        )
+        
         # load signals
         self.signals = []
         for record_name in self.dataset_df["record_name"]:
             signal = np.loadtxt(self.preprocessed_dir / f"{record_name}.csv")
             self.signals.append(signal)
-
-        # keep only the classes of interest
-        keep_ind = np.isin(self.labels, Cinc2017Dataset.classes)
-        self.labels = self.labels[keep_ind]
-        self.signals = [signal for i, signal in enumerate(self.signals) if keep_ind[i]]
-
-        # encode labels
-        self.encoded_labels = np.array(
-            [Cinc2017Dataset.label_encoder[label] for label in self.labels]
-        )
 
         # set transforms
         self.transform = transform
