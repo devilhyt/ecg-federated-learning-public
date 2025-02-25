@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader, WeightedRandomSampler
 from torchvision.transforms.v2 import Lambda
 
 from .cinc2017_dataset import Cinc2017Dataset
-from .transforms import Crop, MinMaxNorm, RandomNoise, RandomTimeScale
+from .transforms import *
 
 
 class Cinc2017DataModule(L.LightningDataModule):
