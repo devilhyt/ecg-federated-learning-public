@@ -222,3 +222,20 @@ class ZScoreNorm(nn.Module):
             raise ValueError("Input signal must be a Tensor")
         signal = (signal - self.mean) / self.std
         return signal
+
+
+class StaticClip(nn.Module):
+    def __init__(self, min: int | float, max: int | float) -> None:
+        super().__init__()
+        if not (isinstance(min, (int, float))):
+            raise ValueError("min must be a int or float")
+        if not (isinstance(max, (int, float))):
+            raise ValueError("max must be a int or float")
+        self.min = min
+        self.max = max
+
+    def forward(self, signal: Tensor) -> Tensor:
+        if not isinstance(signal, Tensor):
+            raise ValueError("Input signal must be a Tensor")
+        signal = torch.clip(signal, self.min, self.max)
+        return signal
