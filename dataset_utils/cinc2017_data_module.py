@@ -137,7 +137,7 @@ class Cinc2017DataModuleFL(Cinc2017DataModule):
         self.num_partitions = num_partitions
 
     def setup(self, stage: str, non_iid: bool = False, alpha: float = 0.5) -> None:
-        if stage == "client":
+        if stage == "fl_client":
             # Wrap flower partitioners and huggingface datasets for federated learning.
             self.client_set = Cinc2017Dataset(
                 dataset="train",
@@ -162,25 +162,8 @@ class Cinc2017DataModuleFL(Cinc2017DataModule):
                 )
 
             self.client_set_partitioner.dataset = dataset
-        elif stage == "train_eval":
-            # Provide the training set for server-side evaluation
-            # without applying any data augmentation.
-            self.train_eval_set = Cinc2017Dataset(
-                dataset="train",
-                transform=self.transforms,
-                target_transform=self.target_transform,
-            )
         else:
             super().setup(stage)
-
-    def train_eval_dataloader(self):
-        """Provide the training set dataloader for server side evaluation."""
-        return DataLoader(
-            self.train_eval_set,
-            batch_size=self.batch_size,
-            shuffle=False,
-            num_workers=self.num_workers,
-        )
 
     def client_dataloaders(self, partition_id: int) -> tuple[DataLoader, DataLoader]:
         """Provide dataloaders for federated learning clients."""
