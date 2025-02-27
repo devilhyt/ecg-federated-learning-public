@@ -211,6 +211,25 @@ class Cinc2017DataModuleFL(Cinc2017DataModule):
 
         return train_dataloader, valid_dataloader
 
+    def client_dataloader(self, partition_id: int) -> DataLoader:
+        """Provide dataloaders for federated learning clients."""
+        partition = self.client_set_partitioner.load_partition(partition_id)
+
+        # calculate class weights for weighted random sampler
+        samples_weight = self._get_samples_weight(partition["label"])
+
+        # apply transforms
+        partition = partition.with_transform(self._apply_transforms)
+
+        train_dataloader = DataLoader(
+            partition,
+            batch_size=self.batch_size,
+            sampler=WeightedRandomSampler(samples_weight, len(samples_weight)),
+            num_workers=self.num_workers,
+        )
+
+        return train_dataloader
+
     def _apply_transforms(self, batch):
         batch["signal"] = [
             self.train_transforms(np.array(signal)) for signal in batch["signal"]
