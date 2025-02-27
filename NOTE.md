@@ -2,6 +2,7 @@
 
 ## Data Preprocessing
 1. Denoising
+    - Skip the first 2 seconds of the signal.
     - High-frequency noise (>40hz).
     - Baseline wander (<0.5hz).
 2. Inversion correction
@@ -13,8 +14,7 @@
     - Train : Valid : Test = 70 : 15 : 15
 2. For federated learning
     - Further split the `Train` set for each client (called `Client_N` set).
-    - Each client then splits its portion into `Client_Train_N` and `Client_Valid_N` set.
-        - Client_Train_N : Client_Valid_N = 90 : 10
+        - The number of clients is 5.
 
 ## Tasks performed in Torch Dataset Class
 1. Label Encoding
@@ -29,8 +29,8 @@
     - ~~Clip the signal to the range of ±3 standard deviations.~~
 3. Convert To Tensor
 4. Cropping
-    - Target time is 60sec
-    - Target length is 6000 (Target time * resampled frequency)
+    - Target time is 58sec
+    - Target length is 5800 (Target time * resampled frequency)
     - If signal length > Target length
         - Train set: Random cropping.
         - Valid set: Head cropping.
@@ -48,4 +48,4 @@
     - Using `WeightedRandomSampler`.
 8. Federated Dataset Partitioning
     - Non_IID: using `DirichletPartitioner`.
-    - IID: using `IidPartitioner`.
+    - ~~IID: using `IidPartitioner`.~~

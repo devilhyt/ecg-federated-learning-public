@@ -1,11 +1,11 @@
 # ECG Federated Learning
 
 ## Overview
-This is a federated learning project based on the PhysioNet/CinC Challenge 2017. The goal is to classify ECG signals into three categories: Normal, Atrial Fibrillation (AF), and Other.
+This project implements Federated Learning for ECG signal classification using the PhysioNet/CinC Challenge 2017 dataset. The objective is to categorize ECG signals into three classes: Normal, Atrial Fibrillation, and Other.
 
 ## Environment
   - OS: Linux Mint 22
-  - Python: 3.11.10
+  - Python: 3.11.11
 
 ## How to run.
 1. Download the dataset.
@@ -13,7 +13,7 @@ This is a federated learning project based on the PhysioNet/CinC Challenge 2017.
     ```bash
     bash download_dataset.sh
     ```
-2. Install the requirements.
+2. Install dependencies.
 
     ```bash
     pip install -r requirements.txt
@@ -21,7 +21,7 @@ This is a federated learning project based on the PhysioNet/CinC Challenge 2017.
 3. Login to Wandb.
     
     Choose one of the following methods:
-    - Login to wandb using the following command.
+    - Via command line.
         ```bash
         wandb login
         ```
@@ -29,16 +29,16 @@ This is a federated learning project based on the PhysioNet/CinC Challenge 2017.
         ```bash
         echo "WANDB_API_KEY=your_wandb_api_key" > .env
         ```
-    - Using the environment variable.
+    - Using environment variable.
         ```bash
         export WANDB_API_KEY=your_wandb_api_key
         ```
-    If you don't want to use wandb (Not Recommended), you can disable it using the following methods:
+    If you prefer not to use Wandb (not recommended), you can disable it:
     - Using .env file.
         ```bash
         echo "WANDB_MODE=disabled" > .env
         ```
-    - Using the environment variable.
+    - Using environment variable.
         ```bash
         export WANDB_MODE=disabled
         ```
