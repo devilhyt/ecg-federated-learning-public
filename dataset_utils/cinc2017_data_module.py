@@ -139,9 +139,7 @@ class Cinc2017DataModuleFL(Cinc2017DataModule):
     def setup(self, stage: str, non_iid: bool = False, alpha: float = 0.5) -> None:
         if stage == "fl_client":
             # Wrap flower partitioners and huggingface datasets for federated learning.
-            self.client_set = Cinc2017Dataset(
-                dataset="train",
-            )
+            self.client_set = Cinc2017Dataset(dataset="train")
             data = {"signal": self.client_set.signals, "label": self.client_set.labels}
             dataset = Dataset.from_dict(data)
             dataset = dataset.cast_column(
@@ -162,8 +160,23 @@ class Cinc2017DataModuleFL(Cinc2017DataModule):
                 )
 
             self.client_set_partitioner.dataset = dataset
+        elif stage == "train_eval":
+            self.train_eval_set = Cinc2017Dataset(
+                dataset="train",
+                transform=self.transforms,
+                target_transform=self.target_transform,
+            )
         else:
             super().setup(stage)
+
+    def train_eval_dataloader(self):
+        """Provide a dataLoader for evaluating the training set without applying data augmentation."""
+        return DataLoader(
+            self.train_eval_set,
+            batch_size=self.batch_size,
+            shuffle=False,
+            num_workers=self.num_workers,
+        )
 
     def client_dataloaders(self, partition_id: int) -> tuple[DataLoader, DataLoader]:
         """Provide dataloaders for federated learning clients."""
@@ -199,5 +212,7 @@ class Cinc2017DataModuleFL(Cinc2017DataModule):
         return train_dataloader, valid_dataloader
 
     def _apply_transforms(self, batch):
-        batch["signal"] = [self.train_transforms(np.array(signal)) for signal in batch["signal"]]
+        batch["signal"] = [
+            self.train_transforms(np.array(signal)) for signal in batch["signal"]
+        ]
         return batch

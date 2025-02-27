@@ -179,3 +179,36 @@ class DenseNetGruEcgModule(L.LightningModule):
             config = {"optimizer": optimizer}
 
         return config
+
+
+class DenseNetGruEcgModuleFL(DenseNetGruEcgModule):
+    """FedProx loss version of DenseNetGruEcgModule"""
+
+    def __init__(
+        self,
+        proximal_mu: float = 0.5,
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+        self.proximal_mu = proximal_mu
+        self.global_params = None
+
+    def init_global_params(self):
+        self.global_params = [p.detach().clone() for p in self.model.parameters()]
+
+    # steps
+    def _common_step(self, batch):
+        x, y = batch["signal"], batch["label"]
+        y_pred = self(x)
+
+        if self.global_params is None:
+            self.init_global_params()
+
+        proximal_term = 0.0
+        for local_weights, global_weights in zip(
+            self.model.parameters(), self.global_params
+        ):
+            proximal_term += torch.square((local_weights - global_weights).norm(2))
+
+        loss = self.loss_fn(y_pred, y) + (self.proximal_mu / 2) * proximal_term
+        return loss, y_pred, y
