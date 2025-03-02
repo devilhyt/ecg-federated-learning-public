@@ -19,7 +19,10 @@ class Cinc2017Dataset(Dataset):
         dataset: str = "train",
         transform: Optional[Callable] = None,
         target_transform: Optional[Callable] = None,
+        concatenate: bool = True,
     ) -> None:
+        self.concatenate = concatenate
+
         # select the dataset partition
         if dataset not in self.datasets:
             raise ValueError(f"dataset must be one of {Cinc2017Dataset.datasets}")
@@ -30,24 +33,33 @@ class Cinc2017Dataset(Dataset):
         config.read("config.ini")
         self.dataset_dir = Path(config["data_preprocessing"]["dataset_dir"])
         self.preprocessed_dir = Path(config["data_preprocessing"]["dst_dir"])
-        
+
         # load the annotation file
         self.dataset_df = pd.read_csv(self.dataset_dir / f"{self.dataset}.csv")
-        
+
         # keep only the classes of interest
         self.dataset_df = self.dataset_df[self.dataset_df["label"].isin(self.classes)]
 
-        # extract and encode labels
-        self.labels = self.dataset_df["label"].to_numpy()
+        # load signals and labels
+        self.signals = []
+        self.labels = []
+        if self.concatenate:
+            for record_name, label in self.dataset_df.itertuples(index=False):
+                signal = np.loadtxt(self.preprocessed_dir / f"{record_name}.csv", ndmin=2)
+                self.signals.append(signal)
+                self.labels.extend([label] * len(signal))
+            self.signals = np.concatenate(self.signals)
+        else:
+            for record_name, label in self.dataset_df.itertuples(index=False):
+                signal = np.loadtxt(self.preprocessed_dir / f"{record_name}.csv", ndmin=2)
+                self.signals.append(signal)
+                self.labels.append(label)
+            # self.signals = np.array(self.signals)
+
+        # encode labels
         self.encoded_labels = np.array(
             [Cinc2017Dataset.label_encoder[label] for label in self.labels]
         )
-        
-        # load signals
-        self.signals = []
-        for record_name in self.dataset_df["record_name"]:
-            signal = np.loadtxt(self.preprocessed_dir / f"{record_name}.csv")
-            self.signals.append(signal)
 
         # set transforms
         self.transform = transform
@@ -60,8 +72,14 @@ class Cinc2017Dataset(Dataset):
         data = self.signals[idx]
         label = self.encoded_labels[idx]
 
-        if self.transform is not None:
-            data = self.transform(data)
+        if self.concatenate:
+            if self.transform is not None:
+                data = self.transform(data)
+        else:
+            if self.transform is not None:
+                data = [self.transform(d)[0] for d in data]
+                data = np.array(data)
+
         if self.target_transform is not None:
             label = self.target_transform(label)
 

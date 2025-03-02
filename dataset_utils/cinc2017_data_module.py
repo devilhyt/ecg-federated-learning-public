@@ -26,7 +26,9 @@ class Cinc2017DataModule(L.LightningDataModule):
         self.random_seed = config.getint("data_preprocessing", "random_seed")
         dst_freq = config.getint("data_preprocessing", "dst_freq")
         dst_time = config.getint("data_preprocessing", "dst_time")
+        seg_time = config.getint("data_preprocessing", "seg_time")
         dst_length = dst_freq * dst_time
+        seg_length = dst_freq * seg_time
 
         # dataloader parameters
         self.batch_size = batch_size
@@ -35,20 +37,20 @@ class Cinc2017DataModule(L.LightningDataModule):
         # transforms
         self.train_transforms = torch.nn.Sequential(
             RandomTimeScale(factor=0.2, p=0.3),
-            RandomNoise(
-                signal_freq=dst_freq,
-                noise_amplitude=0.2,
-                noise_freq=dst_freq // 10,
-                p=0.3,
-            ),
+            # RandomNoise(
+            #     signal_freq=dst_freq,
+            #     noise_amplitude=0.2,
+            #     noise_freq=dst_freq // 10,
+            #     p=0.3,
+            # ),
             Lambda(lambda x: torch.tensor(x, dtype=torch.float32)),
-            Crop(length=dst_length, mode="random"),
+            Crop(length=seg_length, mode="random"),
             MinMaxNorm(),
             Lambda(lambda x: x.unsqueeze(0)),
         )
         self.transforms = torch.nn.Sequential(
             Lambda(lambda x: torch.tensor(x, dtype=torch.float32)),
-            Crop(length=dst_length, mode="head"),
+            # Crop(length=dst_length, mode="head"),
             MinMaxNorm(),
             Lambda(lambda x: x.unsqueeze(0)),
         )
@@ -73,6 +75,13 @@ class Cinc2017DataModule(L.LightningDataModule):
                 dataset="valid",
                 transform=self.transforms,
                 target_transform=self.target_transform,
+            )
+        elif stage == "predict" and not hasattr(self, "test_set"):
+            self.test_set = Cinc2017Dataset(
+                dataset="test",
+                transform=self.transforms,
+                target_transform=self.target_transform,
+                concatenate=False,
             )
         elif stage in ["test", "predict"] and not hasattr(self, "test_set"):
             self.test_set = Cinc2017Dataset(

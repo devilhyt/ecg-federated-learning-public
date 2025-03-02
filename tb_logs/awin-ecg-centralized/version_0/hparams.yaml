@@ -1,0 +1,21 @@
+num_classes: 3
+max_epochs: 50
+input_length: 300
+lr_scheduler_mode: multi_step
+lr: 0.001
+min_lr: 1.0e-05
+show_valid_cm: true
+growth_rate: 16
+block_config:
+- 12
+- 12
+- 24
+- 16
+- 16
+num_init_features: 64
+bn_size: 4
+db_drop_rate: 0.2
+gru_drop_rate: 0.2
+fc_drop_rate: 0.2
+memory_efficient: false
+compression_factor: 0.5

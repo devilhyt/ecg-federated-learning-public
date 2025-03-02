@@ -203,38 +203,39 @@ class DenseNetGruEcg(nn.Module):
             )
             self.features.add_module("denseblock%d" % (i + 1), block)
             num_features = num_features + num_layers * growth_rate
-            trans = _Transition(
-                num_input_features=num_features,
-                num_output_features=math.floor(num_features * compression_factor),
-            )
-            self.features.add_module("transition%d" % (i + 1), trans)
-            num_features = math.floor(num_features * compression_factor)
+            if i != len(block_config) - 1:
+                trans = _Transition(
+                    num_input_features=num_features,
+                    num_output_features=math.floor(num_features * compression_factor),
+                )
+                self.features.add_module("transition%d" % (i + 1), trans)
+                num_features = math.floor(num_features * compression_factor)
 
         # Final layers
         self.features.add_module("norm_final", nn.BatchNorm1d(num_features))
         self.features.add_module("lrelu_final", nn.LeakyReLU(inplace=True))
 
         # GRU layer
-        self.gru = nn.GRU(
-            input_size=num_features,
-            hidden_size=num_features,
-            num_layers=2,
-            batch_first=True,
-            bidirectional=True,
-            dropout=gru_drop_rate,
-        )
-        num_features = num_features * 2
+        # self.gru = nn.GRU(
+        #     input_size=num_features,
+        #     hidden_size=num_features,
+        #     num_layers=2,
+        #     batch_first=True,
+        #     bidirectional=True,
+        #     dropout=gru_drop_rate,
+        # )
+        # num_features = num_features * 2
 
         # fc layer
         self.fc_layer = nn.Sequential(
             OrderedDict(
                 [
-                    # ("avgpool", nn.AdaptiveAvgPool1d(1)),
-                    # ("flatten", nn.Flatten()), 
-                    ("fc1", nn.Linear(num_features, num_features)),
-                    ("bn1", nn.BatchNorm1d(num_features)),
-                    ("lrelu1", nn.LeakyReLU(inplace=True)),
-                    ("dropout1", nn.Dropout(p=fc_drop_rate)),
+                    ("avgpool", nn.AdaptiveAvgPool1d(1)),
+                    ("flatten", nn.Flatten()), 
+                    # ("fc1", nn.Linear(num_features, num_features)),
+                    # ("bn1", nn.BatchNorm1d(num_features)),
+                    # ("lrelu1", nn.LeakyReLU(inplace=True)),
+                    # ("dropout1", nn.Dropout(p=fc_drop_rate)),
                     # ("fc2", nn.Linear(num_features, num_features)),
                     # ("bn2", nn.BatchNorm1d(num_features)),
                     # ("lrelu2", nn.LeakyReLU(inplace=True)),
@@ -256,8 +257,8 @@ class DenseNetGruEcg(nn.Module):
 
     def forward(self, x: Tensor) -> Tensor:
         out: Tensor = self.features(x)
-        out = out.permute(0, 2, 1)
-        out, _ = self.gru(out)
-        out = torch.mean(out, dim=1)
+        # out = out.permute(0, 2, 1)
+        # out, _ = self.gru(out)
+        # out = torch.mean(out, dim=1)
         out = self.fc_layer(out)
         return out
