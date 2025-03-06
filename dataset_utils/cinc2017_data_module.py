@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader, WeightedRandomSampler
 from torchvision.transforms.v2 import Lambda
 
 from .cinc2017_dataset import Cinc2017Dataset
-from .transforms import *
+from .transforms import Crop, MinMaxNorm, RandomTimeScale
 
 
 class Cinc2017DataModule(L.LightningDataModule):
@@ -35,12 +35,6 @@ class Cinc2017DataModule(L.LightningDataModule):
         # transforms
         self.train_transforms = torch.nn.Sequential(
             RandomTimeScale(factor=0.2, p=0.3),
-            RandomNoise(
-                signal_freq=dst_freq,
-                noise_amplitude=0.2,
-                noise_freq=dst_freq // 10,
-                p=0.3,
-            ),
             Lambda(lambda x: torch.tensor(x, dtype=torch.float32)),
             Crop(length=dst_length, mode="random"),
             MinMaxNorm(),
