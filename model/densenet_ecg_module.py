@@ -181,7 +181,7 @@ class DenseNetEcgModule(L.LightningModule):
         return config
 
 
-class DenseNetGruEcgModuleFL(DenseNetEcgModule):
+class DenseNetEcgModuleFL(DenseNetEcgModule):
     """FedProx loss version of DenseNetGruEcgModule"""
 
     def __init__(
