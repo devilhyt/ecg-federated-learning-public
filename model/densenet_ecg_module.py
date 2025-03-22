@@ -157,7 +157,7 @@ class DenseNetEcgModule(L.LightningModule):
                             int(self.max_epochs * 0.5),
                             int(self.max_epochs * 0.75),
                         ],
-                        gamma=0.5,
+                        gamma=0.1,
                     ),
                 },
             }
