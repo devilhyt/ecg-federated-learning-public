@@ -16,3 +16,4 @@ wandb==0.19.7
 plotly==6.0.0
 nbformat==5.10.4
 pywavelets==1.8.0
+torchinfo==1.8.0
